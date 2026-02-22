@@ -8,17 +8,16 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
+use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
-use ratatui::Terminal;
 use tokio::sync::mpsc;
 
 use gbe_nexus::{
-    DomainPayload, Message, MessageHandler, StartPosition, SubscribeOpts, Transport,
-    TransportError,
+    DomainPayload, Message, MessageHandler, StartPosition, SubscribeOpts, Transport, TransportError,
 };
 
 const COMPONENTS: &[&str] = &["operative", "oracle", "watcher", "sentinel", "envoy"];
@@ -118,8 +117,7 @@ impl App {
 
     fn ingest(&mut self, evt: DisplayEvent) {
         for source in &mut self.sources {
-            if !source.subject_prefix.is_empty()
-                && evt.subject.starts_with(&source.subject_prefix)
+            if !source.subject_prefix.is_empty() && evt.subject.starts_with(&source.subject_prefix)
             {
                 source.count += 1;
             }
@@ -134,13 +132,21 @@ impl App {
 
     fn next_source(&mut self) {
         let i = self.source_state.selected().unwrap_or(0);
-        let next = if i >= self.sources.len() - 1 { 0 } else { i + 1 };
+        let next = if i >= self.sources.len() - 1 {
+            0
+        } else {
+            i + 1
+        };
         self.source_state.select(Some(next));
     }
 
     fn prev_source(&mut self) {
         let i = self.source_state.selected().unwrap_or(0);
-        let prev = if i == 0 { self.sources.len() - 1 } else { i - 1 };
+        let prev = if i == 0 {
+            self.sources.len() - 1
+        } else {
+            i - 1
+        };
         self.source_state.select(Some(prev));
     }
 }
@@ -228,11 +234,7 @@ fn parse_summary(subject: &str, payload: &Bytes) -> String {
 }
 
 fn event_type_from_subject(subject: &str) -> String {
-    subject
-        .split('.')
-        .last()
-        .unwrap_or("unknown")
-        .to_string()
+    subject.split('.').last().unwrap_or("unknown").to_string()
 }
 
 fn format_ts(ts: u64) -> String {
@@ -500,7 +502,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let t = gbe_nexus_redis::RedisTransport::connect(config).await?;
         (Arc::new(t), format!("redis: {url}"))
     } else {
-        let t = gbe_nexus_memory::MemoryTransport::new(gbe_nexus_memory::MemoryTransportConfig::default());
+        let t = gbe_nexus_memory::MemoryTransport::new(
+            gbe_nexus_memory::MemoryTransportConfig::default(),
+        );
         (Arc::new(t), "memory (demo)".to_string())
     };
 
