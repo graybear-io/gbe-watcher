@@ -1,0 +1,9 @@
+# OS
+.DS_Store
+
+# Rust
+target/
+Cargo.lock
+
+# Claude Code
+.claude/settings.local.json

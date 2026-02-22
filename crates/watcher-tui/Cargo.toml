@@ -1,0 +1,25 @@
+[package]
+name = "gbe-watcher-tui"
+description = "TUI monitor for GBE ecumene events"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "gbe-watcher"
+path = "src/main.rs"
+
+[dependencies]
+gbe-nexus.workspace = true
+gbe-nexus-memory.workspace = true
+gbe-nexus-redis.workspace = true
+gbe-jobs-domain.workspace = true
+async-trait.workspace = true
+bytes.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+ratatui = "0.29"
+crossterm = "0.28"
