@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio_util::sync::CancellationToken;
 
-use gbe_nexus::Transport;
+use gbe_nexus::{dedup_id, EventEmitter, Transport};
 
 use crate::archive_writer::ArchiveWriter;
 use crate::error::WatcherError;
@@ -58,9 +58,9 @@ pub struct BatchReport {
 pub struct Archiver {
     config: ArchiverConfig,
     writer: Arc<dyn ArchiveWriter>,
-    transport: Arc<dyn Transport>,
     conn: redis::aio::ConnectionManager,
     consumer_id: String,
+    emitter: EventEmitter,
 }
 
 impl Archiver {
@@ -82,13 +82,14 @@ impl Archiver {
             |h| h.to_string_lossy().to_string(),
         );
         let consumer_id = format!("{host}-{}", ulid::Ulid::new());
+        let emitter = EventEmitter::new(transport.clone(), "archiver", &consumer_id);
 
         Ok(Self {
             config,
             writer,
-            transport,
             conn,
             consumer_id,
+            emitter,
         })
     }
 
@@ -256,13 +257,14 @@ impl Archiver {
             "path": path,
             "source": "archiver",
         });
+        let dedup = dedup_id(
+            self.emitter.component(),
+            self.emitter.instance_id(),
+            "archive-batch",
+        );
         let _ = self
-            .transport
-            .publish(
-                "gbe.events.system.archive",
-                Bytes::from(event.to_string()),
-                None,
-            )
+            .emitter
+            .emit("gbe.events.system.archive", 1, dedup, event)
             .await;
 
         Ok(BatchReport {

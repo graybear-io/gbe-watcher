@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio_util::sync::CancellationToken;
 
-use gbe_nexus::Transport;
+use gbe_nexus::{dedup_id, EventEmitter, Transport};
 use gbe_state_store::{ScanFilter, ScanOp, StateStore};
 
 use crate::config::WatcherConfig;
@@ -18,6 +18,7 @@ pub struct Watcher {
     transport: Arc<dyn Transport>,
     store: Arc<dyn StateStore>,
     lock: DistributedLock,
+    emitter: EventEmitter,
 }
 
 #[derive(Debug, Default)]
@@ -43,11 +44,15 @@ impl Watcher {
         )
         .await?;
 
+        let instance_id = format!("watcher-{}", ulid::Ulid::new().to_string().to_lowercase());
+        let emitter = EventEmitter::new(transport.clone(), "watcher", &instance_id);
+
         Ok(Self {
             config,
             transport,
             store,
             lock,
+            emitter,
         })
     }
 
@@ -78,6 +83,26 @@ impl Watcher {
                                 entries = report.entries_trimmed,
                                 "sweep complete"
                             );
+                            let sweep_event = serde_json::json!({
+                                "retried": report.retried,
+                                "failed": report.failed,
+                                "streams_trimmed": report.streams_trimmed,
+                                "entries_trimmed": report.entries_trimmed,
+                                "source": "watcher",
+                            });
+                            let dedup = dedup_id(
+                                self.emitter.component(),
+                                self.emitter.instance_id(),
+                                "sweep",
+                            );
+                            if let Err(e) = self.emitter.emit(
+                                "gbe.events.system.sweep",
+                                1,
+                                dedup,
+                                sweep_event,
+                            ).await {
+                                tracing::warn!("failed to emit sweep event: {e}");
+                            }
                             let _ = self.lock.release().await;
                         }
                         Ok(false) => {
@@ -183,10 +208,12 @@ impl Watcher {
                 "retry_count": retry_count + 1,
                 "source": "watcher",
             });
-            let _ = self
-                .transport
-                .publish(&subject, Bytes::from(payload.to_string()), None)
-                .await;
+            let dedup = dedup_id(
+                self.emitter.component(),
+                self.emitter.instance_id(),
+                "task-retry",
+            );
+            let _ = self.emitter.emit(&subject, 1, dedup, payload).await;
         }
 
         // Re-read original_payload from state if present
@@ -210,13 +237,14 @@ impl Watcher {
             "reason": "retry budget exhausted",
             "source": "watcher",
         });
+        let dedup = dedup_id(
+            self.emitter.component(),
+            self.emitter.instance_id(),
+            "task-fail",
+        );
         let _ = self
-            .transport
-            .publish(
-                "gbe.events.system.error",
-                Bytes::from(payload.to_string()),
-                None,
-            )
+            .emitter
+            .emit("gbe.events.system.error", 1, dedup, payload)
             .await;
 
         Ok(())

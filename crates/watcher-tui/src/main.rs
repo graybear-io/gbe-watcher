@@ -22,7 +22,7 @@ use gbe_nexus::{
 
 const COMPONENTS: &[&str] = &["operative", "oracle", "watcher", "sentinel", "envoy"];
 const LIFECYCLE_EVENTS: &[&str] = &["started", "stopped", "heartbeat", "degraded"];
-const SYSTEM_EVENTS: &[&str] = &["health", "error", "deploy"];
+const SYSTEM_EVENTS: &[&str] = &["health", "error", "deploy", "sweep", "archive"];
 
 /// An event received from the transport, ready for display.
 #[derive(Debug, Clone)]
