@@ -234,7 +234,11 @@ fn parse_summary(subject: &str, payload: &Bytes) -> String {
 }
 
 fn event_type_from_subject(subject: &str) -> String {
-    subject.split('.').last().unwrap_or("unknown").to_string()
+    subject
+        .split('.')
+        .next_back()
+        .unwrap_or("unknown")
+        .to_string()
 }
 
 fn format_ts(ts: u64) -> String {
@@ -463,7 +467,7 @@ fn draw(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App) ->
         let status = Line::from(vec![
             Span::styled(" ", Style::default()),
             Span::styled(
-                format!("{}", app.transport_label),
+                app.transport_label.to_string(),
                 Style::default().fg(Color::DarkGray),
             ),
             Span::raw(" | "),
@@ -536,16 +540,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // Poll for terminal events with a short timeout (for event refresh)
-        if event::poll(Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Char('q') => break,
-                        KeyCode::Char('j') | KeyCode::Down => app.next_source(),
-                        KeyCode::Char('k') | KeyCode::Up => app.prev_source(),
-                        _ => {}
-                    }
-                }
+        if event::poll(Duration::from_millis(100))?
+            && let Event::Key(key) = event::read()?
+            && key.kind == KeyEventKind::Press
+        {
+            match key.code {
+                KeyCode::Char('q') => break,
+                KeyCode::Char('j') | KeyCode::Down => app.next_source(),
+                KeyCode::Char('k') | KeyCode::Up => app.prev_source(),
+                _ => {}
             }
         }
     }
